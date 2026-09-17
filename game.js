@@ -45,20 +45,19 @@ function coloredPart(kind,variant,hex,tone=1){
  const pixels=ctx.getImageData(0,0,w,h),color=rgb(hex),data=pixels.data;for(let i=0;i<data.length;i+=4){if(!data[i+3])continue;if(variant===0||variant>=9){if(data[i+3]<128){data[i+3]=0;continue}data[i+3]=255}const light=(data[i]+data[i+1]+data[i+2])/3;if(light<32)continue;const out=tintPixel([data[i],data[i+1],data[i+2]],color);data[i]=out[0];data[i+1]=out[1];data[i+2]=out[2]}
  ctx.putImageData(pixels,0,0);const url=canvas.toDataURL();if(tintedCache.size>128)tintedCache.clear();tintedCache.set(key,{url,canvas});return url;
 }
-function isSkinPixel(r,g,b,x,y){const area=y<175||(y<235&&x>55&&x<235)||(y<315&&(x<75||x>215))||y>310;return area&&r>100&&r>g+10&&g>b+8&&(r-g)>.65*(g-b)}
-function coloredBody(outfit,tone=1){const key='body'+outfit+':'+tone;if(tintedCache.has(key))return tintedCache.get(key).url;const canvas=document.createElement('canvas');canvas.width=290;canvas.height=445;const ctx=canvas.getContext('2d',{willReadFrequently:true});ctx.drawImage(colorAtlas,[155,448,736,1025][outfit]-145,60,290,445,0,0,290,445);const patch=ctx.getImageData(126,130,38,3);for(let y=134;y<153;y++)ctx.putImageData(patch,126,y);if(tone!==1){const pixels=ctx.getImageData(0,0,290,445),p=pixels.data,targetColor=rgb(skinTones[tone][1]);for(let y=0;y<445;y++)for(let x=0;x<290;x++){const i=(y*290+x)*4;if(!p[i+3]||!isSkinPixel(p[i],p[i+1],p[i+2],x,y))continue;const shade=(p[i]+p[i+1]+p[i+2])/3/205;for(let k=0;k<3;k++)p[i+k]=Math.min(255,Math.round(targetColor[k]*shade))}ctx.putImageData(pixels,0,0)}const url=canvas.toDataURL();tintedCache.set(key,{url,canvas});return url}
+function isSkinPixel(r,g,b,x,y,outfit){
+ const dress=outfit===1||outfit===3;
+ const edge=115-Math.max(0,y-230)*.55;
+ const region=y<176||(y<203&&x>104&&x<188)||(dress?((y>=176&&y<300&&(x<edge||x>290-edge))||(y>335&&((x>105&&x<140)||(x>150&&x<187)))):((y>265&&y<315)&&(x<87||x>210)));
+ return region&&r>45&&r>g+7&&g>b+5&&(r-g)>.55*(g-b)
+}
+function coloredBody(outfit,tone=1){const key='body'+outfit+':'+tone;if(tintedCache.has(key))return tintedCache.get(key).url;const canvas=document.createElement('canvas');canvas.width=290;canvas.height=445;const ctx=canvas.getContext('2d',{willReadFrequently:true});ctx.drawImage(colorAtlas,[155,448,736,1025][outfit]-145,60,290,445,0,0,290,445);const patch=ctx.getImageData(126,130,38,3);for(let y=134;y<153;y++)ctx.putImageData(patch,126,y);if(tone!==1){const pixels=ctx.getImageData(0,0,290,445),p=pixels.data,targetColor=rgb(skinTones[tone][1]);for(let y=0;y<445;y++)for(let x=0;x<290;x++){const i=(y*290+x)*4;if(!p[i+3]||!isSkinPixel(p[i],p[i+1],p[i+2],x,y,outfit)||((outfit===0||outfit===2)&&x>115&&x<180&&y>185&&y<295))continue;const shade=(p[i]+p[i+1]+p[i+2])/3/205;for(let k=0;k<3;k++)p[i+k]=Math.min(255,Math.round(targetColor[k]*shade))}ctx.putImageData(pixels,0,0)}const url=canvas.toDataURL();tintedCache.set(key,{url,canvas});return url}
 function colorLayer(url,left,top,width,height,cls){return `<div class="avatar-layer ${cls}" style="left:${left}%;top:${top}%;width:${width}%;height:${height}%;background-image:url('${url}');background-size:100% 100%"></div>`}
 const guestSprites=new Map();
 function guestHeight(look,groomHeight,brideHeight){return look.height===1?brideHeight*.94:groomHeight}
 function guestSprite(look){
- const key=[look.hair,look.outfit,look.eyeShape||0,look.skinTone??1,look.hairColor,look.eyeColor,look.pose||'stand'].join(':');if(guestSprites.has(key))return guestSprites.get(key);
+ const key=[look.hair,look.outfit,look.eyeShape||0,look.skinTone??1,look.hairColor,look.eyeColor].join(':');if(guestSprites.has(key))return guestSprites.get(key);
  coloredBody(look.outfit,look.skinTone??1);let body=tintedCache.get('body'+look.outfit+':'+(look.skinTone??1)).canvas;
- if(look.pose==='wave'||look.pose==='heart'){
-  const original=body,posed=document.createElement('canvas');posed.width=290;posed.height=445;const pc=posed.getContext('2d');pc.imageSmoothingEnabled=false;pc.drawImage(original,0,0);
-  const arm=(right,angle)=>{const x=right?195:0,pivot=right?201:89,armHeight=look.outfit===1||look.outfit===3?90:205;pc.clearRect(x,205,95,armHeight);pc.save();pc.translate(pivot,220);pc.rotate(angle);pc.drawImage(original,x,205,95,armHeight,x-pivot,-15,95,armHeight);pc.restore()};
-  arm(false,look.pose==='wave'?2.35:-.95);if(look.pose==='heart')arm(true,.95);body=posed;
- }
-
  coloredPart('hair',look.hair,look.hairColor);const hair=tintedCache.get('hair:'+look.hair+':'+look.hairColor).canvas;
  coloredFace(look.eyeShape||0,look.eyeColor,look.skinTone??1);const face=tintedCache.get('face:'+(look.eyeShape||0)+':'+look.eyeColor+':'+(look.skinTone??1)).canvas;
  const full=document.createElement('canvas');full.width=290;full.height=535;const ctx=full.getContext('2d',{willReadFrequently:true});ctx.drawImage(body,0,90);ctx.drawImage(face,74,150,142,92);ctx.drawImage(hair,0,90+hairOffsets[look.hair]);
@@ -119,7 +118,7 @@ function ceremonyFrame(t){
  }else if(elapsed<14){$('#bride').style.top='24%';$('#ceremonyText').textContent='從今天起，與你相伴';$('#bride').classList.remove('walking');$('#bride').style.left=(55-(elapsed-12)*3)+'%';$('#groom').style.left=(45+(elapsed-12)*1.5)+'%';$('#saviri').style.left='34%';$('#diana').style.left='66%';for(const id of ['saviri','diana'])$('#'+id).classList.remove('flower-walk')}
  else if(elapsed<22){$('#ceremony').classList.add('kiss-mode');$('#ceremonyText').textContent='以一個吻，許下永遠';for(const id of ['bride','groom','saviri','diana'])$('#'+id).hidden=true;clearPetals();$('#kiss').hidden=false;$('#hearts').hidden=false}else finishCeremony();
 }
-const places={garden:[{x:22,y:63,r:12,name:'貼紙祝福板',board:true},{x:45,y:29,r:12,name:'伊薩克',art:'special mature',text:'歡迎。',action:'送上新婚祝福 ♡'},{x:57,y:29,r:12,name:'白暝',art:'sprite s1',text:'歡迎來到我們的婚禮～',action:'送上新婚祝福 ♡'},{x:79,y:37,r:13,name:'鮑里斯',art:'special boris',text:'「嗚！」四肢著地的鮑里斯抬起頭，輕輕嗅了嗅空氣，脖子上的藍色蝴蝶結也跟著晃了晃。',action:'向鮑里斯打招呼 ♡'},{x:22,y:72,r:15,name:'花園蛋糕',text:'小巧的藍白奶油花，藏著甜甜的心意。宴會廳裡還有大婚禮蛋糕等著你！',action:'品嚐一小口 ♡'}],hall:[{x:37,y:37,r:11,name:'薩維里',child:'saviri',art:'child-portrait',text:'薩維里把小花籃抱在懷裡，輕輕點頭。「這朵……給你。」他安安靜靜地挑了一朵小白花。',action:'收下小白花，陪他坐一會兒 ♡'},{x:63,y:37,r:11,name:'狄安娜',child:'diana',art:'child-portrait',text:'「你看、你看！花花飛起來了！」狄安娜晃著藍色蝴蝶結，開心地把花瓣分給你。「一起玩嘛～」',action:'和狄安娜一起玩撒花 ♡'},{x:50,y:49,r:17,name:'大結婚蛋糕',text:'層層白色奶油綴著藍色花朵，這座大蛋糕是今天最甜蜜的主角。一起分享伊薩克與白暝的幸福吧。',action:'享用婚禮蛋糕 ♡'},{x:19,y:33,r:12,name:'花好月圓（炸湯圓）',text:'粉紅與金黃的小湯圓炸得外酥內軟，撒上香甜花生粉。花好月圓，祝新人團團圓圓、甜甜蜜蜜！',action:'品嚐花好月圓 ♡'},{x:83,y:34,r:13,name:'婚宴佳餚',text:'香烤雞肉、鮮蝦與熱騰騰的料理已經上桌，為今天的相聚添上豐盛的滋味。',action:'享用美食 ♡'},{x:83,y:55,r:14,name:'水果與甜點',text:'繽紛水果、精緻小蛋糕與甜點擺滿了餐桌，挑一份喜歡的，慢慢享用吧。',action:'拿一份甜點 ♡'}]};
+const places={garden:[{x:22,y:63,r:12,name:'貼紙祝福板',board:true},{x:45,y:29,r:12,name:'伊薩克',art:'special mature',text:'歡迎。',action:'送上新婚祝福 ♡'},{x:57,y:29,r:12,name:'白暝',art:'sprite s1',text:'歡迎來到我們的婚禮～',action:'送上新婚祝福 ♡'},{x:22,y:40,r:13,name:'鮑里斯',art:'special boris',text:'「嗚！」四肢著地的鮑里斯抬起頭，輕輕嗅了嗅空氣，脖子上的藍色蝴蝶結也跟著晃了晃。',action:'向鮑里斯打招呼 ♡'},{x:22,y:72,r:15,name:'花園蛋糕',text:'小巧的藍白奶油花，藏著甜甜的心意。宴會廳裡還有大婚禮蛋糕等著你！',action:'品嚐一小口 ♡'}],hall:[{x:37,y:37,r:11,name:'薩維里',child:'saviri',art:'child-portrait',text:'薩維里把小花籃抱在懷裡，輕輕點頭。「這朵……給你。」他安安靜靜地挑了一朵小白花。',action:'收下小白花，陪他坐一會兒 ♡'},{x:63,y:37,r:11,name:'狄安娜',child:'diana',art:'child-portrait',text:'「你看、你看！花花飛起來了！」狄安娜晃著藍色蝴蝶結，開心地把花瓣分給你。「一起玩嘛～」',action:'和狄安娜一起玩撒花 ♡'},{x:50,y:49,r:17,name:'大結婚蛋糕',text:'層層白色奶油綴著藍色花朵，這座大蛋糕是今天最甜蜜的主角。一起分享伊薩克與白暝的幸福吧。',action:'享用婚禮蛋糕 ♡'},{x:19,y:33,r:12,name:'花好月圓（炸湯圓）',text:'粉紅與金黃的小湯圓炸得外酥內軟，撒上香甜花生粉。花好月圓，祝新人團團圓圓、甜甜蜜蜜！',action:'品嚐花好月圓 ♡'},{x:83,y:34,r:13,name:'婚宴佳餚',text:'香烤雞肉、鮮蝦與熱騰騰的料理已經上桌，為今天的相聚添上豐盛的滋味。',action:'享用美食 ♡'},{x:83,y:55,r:14,name:'水果與甜點',text:'繽紛水果、精緻小蛋糕與甜點擺滿了餐桌，挑一份喜歡的，慢慢享用吧。',action:'拿一份甜點 ♡'}]};
 function switchRoom(next){room=next;held.clear();target=null;$('#map').src=room==='garden'?'garden.png':'banquet.png';$('#map').alt=room==='garden'?'藍白花園婚禮':'室內宴會廳，中央大結婚蛋糕與兩側美食餐桌';$('#roomName').textContent=room==='garden'?'藍色花園':'室內宴會廳';for(const id of ['groom','bride','bear','blessingBoard'])$('#'+id).hidden=room!=='garden';syncChildren();$('#portal').textContent=room==='garden'?'宴會廳 →':'← 主會場';$('#portal').classList.toggle('return',room==='hall');if(playing){positions=room==='hall'?[{x:16,y:55},{x:18,y:62}]:[{x:84,y:54},{x:79,y:59}]}render()}
 $('#portal').onclick=e=>{e.stopPropagation();if(ceremonyStart===null)switchRoom(room==='garden'?'hall':'garden')};$('#portal').onpointerdown=e=>e.stopPropagation();
 $('#switchPlayer').onclick=()=>{active=1-active;target=null;held.clear();$('#switchPlayer').textContent='交換主控 · '+guestName(active)+' ↔';render()};
@@ -166,34 +165,3 @@ $('#retryPhoto').onclick=generatePhoto;
 function returnToWedding(){photoRun++;farewell.close();playing=true;held.clear();if(resumeMusic)startMusic()}
 $('#returnWedding').onclick=returnToWedding;farewell.addEventListener('cancel',e=>{e.preventDefault();returnToWedding()});
 
-// Blessing stickers are shared and stored by the wedding's database.
-const stickerTypes=[['heart',0,'愛心'],['flower',1,'花花'],['bear',2,'小熊'],['ribbon',3,'蝴蝶結'],['star',4,'星星'],['dove',5,'白鴿']];
-function stickerIcon(type){const icon=document.createElement('span');if(type){icon.className='pixel-sticker';icon.style.backgroundPosition=(type[1]%3*50)+'% '+(Math.floor(type[1]/3)*100)+'%'}icon.setAttribute('aria-hidden','true');return icon}
-let boardRecords=[],selectedSticker='heart',selectedCell=null,stickerRequestId=null,boardBusy=false,boardLoaded=false,boardLoadRun=0;
-function drawStickerBoard(){
- const wall=$('#stickerWall');wall.replaceChildren();
- for(let cell=0;cell<25;cell++){
-  const records=boardRecords.filter(r=>r.cell===cell),last=records[0],b=document.createElement('button');b.type='button';b.className='sticker-cell';b.classList.toggle('selected',selectedCell===cell);b.disabled=boardBusy;
-  const pending=selectedCell===cell,type=stickerTypes.find(t=>t[0]===(pending?selectedSticker:last?.kind));
-  const icon=stickerIcon(type);if(pending)icon.classList.add('pending-sticker');b.append(icon);
-  if(records.length>1){const n=document.createElement('small');n.textContent='+'+(records.length-1);b.append(n)}
-  b.setAttribute('aria-label','第'+(Math.floor(cell/5)+1)+'排、第'+(cell%5+1)+'格'+(last?'，'+last.name+' 的'+(stickerTypes.find(t=>t[0]===last.kind)?.[2]||'貼紙'):'，空白位置'));
-  b.onclick=()=>{selectedCell=cell;stickerRequestId=null;$('#stickerCredit').textContent=records.length?records.slice(0,3).map(r=>r.name+' '+(stickerTypes.find(t=>t[0]===r.kind)?.[2]||'')).join('、'):'這裡等著你的祝福';drawStickerBoard()};wall.append(b);
- }
- $('#postSticker').disabled=boardBusy||!boardLoaded||selectedCell===null;
- document.querySelectorAll('[data-sticker]').forEach(b=>{b.disabled=boardBusy;b.setAttribute('aria-pressed',b.dataset.sticker===selectedSticker)});
-}
-stickerTypes.forEach(type=>{const [key,,label]=type;const b=document.createElement('button');b.type='button';b.dataset.sticker=key;b.append(stickerIcon(type));b.setAttribute('aria-label',label);b.onclick=()=>{selectedSticker=key;stickerRequestId=null;drawStickerBoard()};$('#stickerPalette').append(b)});
-async function loadStickers(){
- const run=++boardLoadRun;$('#boardStatus').textContent='正在讀取大家的祝福…';boardLoaded=false;drawStickerBoard();
- try{const r=await fetch('api/stickers',{cache:'no-store'});if(!r.ok)throw new Error();const data=await r.json();if(run!==boardLoadRun)return;if(!Array.isArray(data.stickers))throw new Error();boardRecords=data.stickers;boardLoaded=true;$('#boardStatus').textContent=data.total?'已留下 '+data.total+' 張祝福貼紙'+(data.total>500?'，展示最近 500 張':''):'還沒有貼紙，來留下第一份祝福吧！'}
- catch{if(run!==boardLoadRun)return;$('#boardStatus').textContent='暫時無法讀取祝福，請按「重新載入祝福」再試一次。'}drawStickerBoard();
-}
-function openStickerBoard(){if(!playing||ceremonyStart!==null||modal.open||talk.open)return;held.clear();target=null;$('#stickerDialog').showModal();if(window.WEDDING_BOARD_URL){$('#boardStatus').textContent='貼紙祝福集中保存在婚禮網站，前往共用祝福板即可查看與貼上。';for(const id of ['stickerPalette','stickerWall','postSticker','refreshStickers'])$('#'+id).hidden=true;$('#sharedBoardLink').hidden=false;$('#sharedBoardLink').href=window.WEDDING_BOARD_URL;return}loadStickers()}
-$('#blessingBoard').onpointerdown=e=>e.stopPropagation();$('#blessingBoard').onclick=e=>{e.stopPropagation();openStickerBoard()};
-$('#closeStickers').onclick=()=>$('#stickerDialog').close();$('#refreshStickers').onclick=()=>{if(!boardBusy)loadStickers()};
-$('#postSticker').onclick=async()=>{
- if(boardBusy||!boardLoaded||selectedCell===null)return;boardBusy=true;stickerRequestId??=crypto.randomUUID();const submission={id:stickerRequestId,kind:selectedSticker,cell:selectedCell,name:guestName(active)};$('#boardStatus').textContent='正在保存你的祝福…';drawStickerBoard();
- try{const r=await fetch('api/stickers',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(submission)});if(!r.ok)throw new Error();const data=await r.json();if(!data.sticker?.id)throw new Error();boardRecords=[data.sticker,...boardRecords.filter(s=>s.id!==data.sticker.id)].slice(0,500);selectedCell=null;stickerRequestId=null;$('#boardStatus').textContent='祝福已保存！下次來，還能在這裡看見。';$('#stickerCredit').textContent=submission.name+' 留下了 '+stickerTypes.find(t=>t[0]===submission.kind)[2];notify('你的貼紙祝福已保存 ♡')}
- catch{$('#boardStatus').textContent='還沒確認保存成功，選好的貼紙和位置已保留，請再按一次「貼上並保存」。'}finally{boardBusy=false;drawStickerBoard()}
-};
